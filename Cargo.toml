@@ -1,0 +1,10 @@
+[package]
+name = "wasm-modules"
+version = "0.1.0"
+authors = ["Brooks J Rady <b.j.rady@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+wasmer = "1.0.0-alpha4"
+wasmer-compiler-llvm = "1.0.0-alpha4"
+wasmer-engine-jit = "1.0.0-alpha4"
