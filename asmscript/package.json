@@ -1,0 +1,13 @@
+{
+  "scripts": {
+    "build": "asc assembly/index.ts -b build/index.wasm -t build/index.wat --runtime half",
+    "test": "node tests"
+  },
+  "dependencies": {
+    "@assemblyscript/loader": "^0.16.1",
+    "as-wasi": "^0.3.0"
+  },
+  "devDependencies": {
+    "assemblyscript": "^0.16.1"
+  }
+}
