@@ -15,6 +15,9 @@ impl OutputCapturer {
             buffer: VecDeque::new(),
         }
     }
+    pub fn clear(&mut self) {
+        self.buffer = VecDeque::new();
+    }
 }
 
 impl Display for OutputCapturer {

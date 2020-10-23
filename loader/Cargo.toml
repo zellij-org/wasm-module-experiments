@@ -6,8 +6,10 @@ edition = "2018"
 
 [dependencies]
 wasmer = "1.0.0-alpha4"
-wasmer-compiler-llvm = "1.0.0-alpha4"
+wasmer-compiler-singlepass = "1.0.0-alpha4"
 wasmer-engine-jit = "1.0.0-alpha4"
 wasmer-wasi = "1.0.0-alpha4"
 typetag = "0.1"
 serde = { version = "1.0", features = ["derive"] }
+tui = { version = "*", features = ["crossterm"] }
+crossterm = "*"

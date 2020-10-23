@@ -1,4 +1,5 @@
 use std::{fs, io};
+use colored::*;
 
 #[link(wasm_import_module = "mosaic")]
 extern {
@@ -21,6 +22,8 @@ fn main() -> io::Result<()> {
     println!("Getting brave and calling a foreign function!");
     let magic = unsafe { magic_number() };
     println!("The magic number was: {:?}", magic);
+
+    println!("{} {} !", "it".green(), "works".blue().bold());
 
     Ok(())
 }
