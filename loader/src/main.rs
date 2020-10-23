@@ -6,7 +6,7 @@ use crossterm::{terminal, ExecutableCommand};
 use crossterm::event::{self, Event, KeyCode, KeyEvent};
 use std::{
     error::Error,
-    io::{self, Stdout},
+    io::{self, Stdout, Write},
 };
 use tui::{backend::CrosstermBackend, Terminal, text::Text, widgets::Paragraph};
 
@@ -74,14 +74,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut tui = setup_tui()?;
 
     loop {
-        tui.draw(|mut f| {
-            // Check for output
-            let mut state = wasi_env.state();
-            let wasi_file = state.fs.stdout_mut().unwrap().as_mut().unwrap();
-            let output: &mut fluff::OutputCapturer = wasi_file.downcast_mut().unwrap();
-            let screen = Text::raw(output.to_string());
-            f.render_widget(Paragraph::new(screen), f.size());
-        })?;
+        // Check for output
+        let mut state = wasi_env.state();
+        let wasi_file = state.fs.stdout_mut().unwrap().as_mut().unwrap();
+        let output: &mut fluff::OutputCapturer = wasi_file.downcast_mut().unwrap();
+        write!(io::stdout(), "{}\n\r", output.to_string().lines().collect::<Vec<_>>().join("\n\r"))?;
         if let Event::Key(KeyEvent { code: KeyCode::Char('q'), ..}) = event::read()? {
             break;
         }
