@@ -1,20 +1,18 @@
+mod fluff;
+
 use wasmer::{Exports, Function, Instance, Module, Store};
 use wasmer_compiler_singlepass::Singlepass;
 use wasmer_engine_jit::JIT;
 use wasmer_wasi::WasiState;
 use crossterm::{terminal, ExecutableCommand};
 use crossterm::event::{self, Event, KeyCode, KeyEvent};
-use std::{
-    error::Error,
-    io::{self, Stdout, Write},
-};
-use tui::{backend::CrosstermBackend, Terminal, text::Text, widgets::Paragraph};
-
-
-mod fluff;
+use std::{os::unix::prelude::AsRawFd, error::Error, io::{self, Stdout, Write, Read}, process::Stdio};
+use tui::{backend::CrosstermBackend, Terminal};
+use serde_json;
 
 // FIXME: PR to write an ImportObject merging method
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+
     // Let's pick a WASM file to load!
     let paths = vec!["target/wasm32-wasi/debug/module.wasm",
                                 "asmscript/build/index.wasm",
@@ -43,6 +41,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating `WasiEnv`...");
     // A place to store captured output
     let output = fluff::OutputCapturer::new();
+    let input = fluff::OutputCapturer::new();
     // First, we create the `WasiEnv`
     // use std::env;
     // let (l, c) = (env::var("LINES")?, env::var("COLUMNS")?);
@@ -50,6 +49,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .args(&["These are words of wisdom coming from the mighty Mosaic!"])
         .env("CLICOLOR_FORCE", "1")
         .preopen_dir(".")?
+        .stdin(Box::new(input))
         .stdout(Box::new(output))
         .finalize()?;
 
@@ -69,19 +69,47 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Call WASI `_start` function...\n\n");
     // And we just call the `_start` function!
     let start = instance.exports.get_function("_start")?;
+    let handle_key = instance.exports.get_function("handle_key")?;
+
+    {
+        let mut state = wasi_env.state();
+        let wasi_file = state.fs.stdin_mut()?.as_mut().unwrap();
+        let input: &mut fluff::OutputCapturer = wasi_file.downcast_mut().unwrap();
+        writeln!(input, "Here is a spicy input!")?;
+    }
+
+    handle_key.call(&[])?;
+
+ /*    let mut buf = String::new();
+    output.take(10).read_to_string(&mut buf)?;
+    write!(io::stdout(), "Hello\n\r")?;
+    write!(io::stdout(), "{}\n\r", buf)?; */
     start.call(&[])?;
 
-    let mut tui = setup_tui()?;
+    let tui = setup_tui()?;
+
+    //
 
     loop {
         // Check for output
-        let mut state = wasi_env.state();
-        let wasi_file = state.fs.stdout_mut().unwrap().as_mut().unwrap();
-        let output: &mut fluff::OutputCapturer = wasi_file.downcast_mut().unwrap();
-        write!(io::stdout(), "{}\n\r", output.to_string().lines().collect::<Vec<_>>().join("\n\r"))?;
-        if let Event::Key(KeyEvent { code: KeyCode::Char('q'), ..}) = event::read()? {
-            break;
+        {
+            let mut state = wasi_env.state();
+            let wasi_file = state.fs.stdout_mut()?.as_mut().unwrap();
+            let output: &mut fluff::OutputCapturer = wasi_file.downcast_mut().unwrap();
+            write!(io::stdout(), "{}\n\r", output.to_string().lines().collect::<Vec<_>>().join("\n\r"))?;
+            output.clear();
+
+            let wasi_file = state.fs.stdin_mut()?.as_mut().unwrap();
+            let input: &mut fluff::OutputCapturer = wasi_file.downcast_mut().unwrap();
+            input.clear();
+
+            match event::read()? {
+                Event::Key(KeyEvent { code: KeyCode::Char('q'), ..}) => break,
+                Event::Key(e) => writeln!(input, "{}\r", serde_json::to_string(&e)?)?,
+                _ => ()
+            }
         }
+        handle_key.call(&[])?;
     }
 
     teardown_tui(tui)?;

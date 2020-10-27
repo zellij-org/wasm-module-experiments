@@ -1,5 +1,9 @@
-use std::{fs, io};
+use std::{fs, io, cell::RefCell};
 use colored::*;
+
+thread_local! {
+    static COUNTER: RefCell<i32> = RefCell::new(0);
+}
 
 #[link(wasm_import_module = "mosaic")]
 extern {
@@ -26,4 +30,14 @@ fn main() -> io::Result<()> {
     println!("{} {} !", "it".green(), "works".blue().bold());
 
     Ok(())
+}
+
+#[no_mangle]
+pub fn handle_key() {
+    let mut choice = String::new();
+    io::stdin().read_line(&mut choice).unwrap();
+    COUNTER.with(|counter| {
+        println!("{}: {}", counter.borrow(), choice);
+        *counter.borrow_mut() += 1;
+    });
 }
