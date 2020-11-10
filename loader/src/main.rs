@@ -1,17 +1,19 @@
 mod fluff;
 
-use wasmer::{Exports, Function, Instance, Module, Store};
+use wasmer::{Exports, Function, Instance, Module, Store, Value};
 use wasmer_compiler_singlepass::Singlepass;
 use wasmer_engine_jit::JIT;
 use wasmer_wasi::WasiState;
 use crossterm::{terminal, ExecutableCommand};
 use crossterm::event::{self, Event, KeyCode, KeyEvent};
-use std::{os::unix::prelude::AsRawFd, error::Error, io::{self, Stdout, Write, Read}, process::Stdio};
+use std::{error::Error, sync::Mutex, io::{self, Stdout, Write}, path::Path, process::Command, sync::Arc, cell::RefCell};
 use tui::{backend::CrosstermBackend, Terminal};
 use serde_json;
 
 // FIXME: PR to write an ImportObject merging method
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // State, done poorly
+    let should_open_file = Arc::new(Mutex::new(false));
 
     // Let's pick a WASM file to load!
     let paths = vec!["target/wasm32-wasi/debug/module.wasm",
@@ -59,7 +61,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // and merge it with our host exports
     let mut import_object = wasi_env.import_object(&module)?;
     let mut host_exports = Exports::new();
-    host_exports.insert("magic_number", Function::new_native(&store, || 42));
+    host_exports.insert("host_open_file", Function::new_native_with_env(&store, Arc::clone(&wasi_env.state), host_open_file));
     import_object.register("mosaic", host_exports);
     let instance = Instance::new(&module, &import_object)?;
 
@@ -70,27 +72,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // And we just call the `_start` function!
     let start = instance.exports.get_function("_start")?;
     let handle_key = instance.exports.get_function("handle_key")?;
+    let draw = instance.exports.get_function("draw")?;
 
-    {
-        let mut state = wasi_env.state();
-        let wasi_file = state.fs.stdin_mut()?.as_mut().unwrap();
-        let input: &mut fluff::OutputCapturer = wasi_file.downcast_mut().unwrap();
-        writeln!(input, "Here is a spicy input!")?;
-    }
-
-    handle_key.call(&[])?;
-
- /*    let mut buf = String::new();
-    output.take(10).read_to_string(&mut buf)?;
-    write!(io::stdout(), "Hello\n\r")?;
-    write!(io::stdout(), "{}\n\r", buf)?; */
     start.call(&[])?;
 
     let tui = setup_tui()?;
 
-    //
-
     loop {
+        let (cols, rows) = terminal::size()?;
+        draw.call(&[Value::I32(rows as i32), Value::I32(cols as i32)])?;
         // Check for output
         {
             let mut state = wasi_env.state();
@@ -105,10 +95,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             match event::read()? {
                 Event::Key(KeyEvent { code: KeyCode::Char('q'), ..}) => break,
-                Event::Key(e) => writeln!(input, "{}\r", serde_json::to_string(&e)?)?,
-                _ => ()
+                Event::Key(e) => {
+                    writeln!(input, "{}\r", serde_json::to_string(&e)?)?;
+                }
+                _ => continue,
             }
         }
+        // I can't be in the same scope as the stdin WasiFile or I deadlock!
         handle_key.call(&[])?;
     }
 
@@ -135,4 +128,12 @@ pub fn teardown_tui(mut tui: TUI) -> Result<(), Box<dyn Error>> {
     stdout.execute(terminal::LeaveAlternateScreen)?;
     tui.show_cursor()?;
     Ok(())
+}
+
+fn host_open_file(arc_state: &mut Arc<Mutex<WasiState>>) {
+    let mut state = arc_state.lock().unwrap();
+    let wasi_file = state.fs.stdout_mut().unwrap().as_mut().unwrap();
+    let output: &mut fluff::OutputCapturer = wasi_file.downcast_mut().unwrap();
+    Command::new("xdg-open").arg(output.to_string().lines().next().unwrap()).spawn().unwrap();
+    output.clear();
 }

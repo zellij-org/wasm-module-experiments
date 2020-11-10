@@ -5,10 +5,10 @@ authors = ["Brooks J Rady <b.j.rady@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-wasmer = "1.0.0-alpha4"
-wasmer-compiler-singlepass = "1.0.0-alpha4"
-wasmer-engine-jit = "1.0.0-alpha4"
-wasmer-wasi = "1.0.0-alpha4"
+wasmer = { git = "https://github.com/TheLostLambda/wasmer.git" }
+wasmer-compiler-singlepass = { git = "https://github.com/TheLostLambda/wasmer.git" }
+wasmer-engine-jit = { git = "https://github.com/TheLostLambda/wasmer.git" }
+wasmer-wasi = { git = "https://github.com/TheLostLambda/wasmer.git" }
 typetag = "0.1"
 serde = { version = "1.0", features = ["derive"] }
 tui = { version = "*", features = ["crossterm"] }

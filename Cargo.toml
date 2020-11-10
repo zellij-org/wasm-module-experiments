@@ -1,4 +1,4 @@
 [workspace]
 
-members = ["loader", "module"]
+members = ["loader", "module", "mosaic-plugin"]
 default-members = ["loader"]

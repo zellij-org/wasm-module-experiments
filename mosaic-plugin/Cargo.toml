@@ -1,9 +1,9 @@
 [package]
-name = "module"
+name = "mosaic-plugin"
 version = "0.1.0"
 authors = ["Brooks J Rady <b.j.rady@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-colored = "2"
-mosaic-plugin = {version = "*", path = "../mosaic-plugin/"}
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "*"

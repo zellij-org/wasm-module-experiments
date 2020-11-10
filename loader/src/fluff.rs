@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::{collections::VecDeque, fmt::{self, Display}};
+use std::fmt::{self, Display};
 use std::io::{self, Read, Seek, Write};
 use wasmer_wasi::{WasiFile, WasiFsError};
 

@@ -1,43 +1,88 @@
-use std::{fs, io, cell::RefCell};
+use std::{fs::{self, DirEntry}, cell::RefCell, path::PathBuf, cmp::min};
 use colored::*;
+use mosaic_plugin::{get_key, KeyCode, open_file};
 
 thread_local! {
-    static COUNTER: RefCell<i32> = RefCell::new(0);
+    static STATE: RefCell<State> = RefCell::new(State::default());
 }
 
-#[link(wasm_import_module = "mosaic")]
-extern {
-    fn magic_number() -> i32;
+#[derive(Default)]
+struct State {
+    path: PathBuf,
+    files: Vec<DirEntry>,
+    selected: usize,
 }
-fn main() -> io::Result<()> {
-    let mut entries = fs::read_dir(".")?
-        .map(|res| res.map(|e| e.path()))
-        .collect::<Result<Vec<_>, io::Error>>()?;
 
-    // The order in which `read_dir` returns entries is not guaranteed. If reproducible
-    // ordering is required the entries should be explicitly sorted.
+// FIXME: Consider ditching the main function and just using init()
+fn main() {
+    refresh_directory();
+}
 
-    entries.sort();
+#[no_mangle]
+pub fn draw(rows: i32, cols: i32) {
+    STATE.with(|state| {
+        let state = state.borrow_mut();
+        for i in 0..rows as usize - 1 {
+            if let Some(entry) = state.files.get(i) {
+                let mut path = entry.path().to_string_lossy().into_owned().normal();
+                if entry.file_type().unwrap().is_dir() {
+                    path = path.dimmed().bold();
+                }
 
-    // The entries have now been sorted by their path.
-
-    println!("{:?}", entries);
-
-    println!("Getting brave and calling a foreign function!");
-    let magic = unsafe { magic_number() };
-    println!("The magic number was: {:?}", magic);
-
-    println!("{} {} !", "it".green(), "works".blue().bold());
-
-    Ok(())
+                if i == state.selected {
+                    println!("{}", path.reversed());
+                } else {
+                    println!("{}", path);
+                }
+            } else {
+                println!();
+            }
+        }
+    });
 }
 
 #[no_mangle]
 pub fn handle_key() {
-    let mut choice = String::new();
-    io::stdin().read_line(&mut choice).unwrap();
-    COUNTER.with(|counter| {
-        println!("{}: {}", counter.borrow(), choice);
-        *counter.borrow_mut() += 1;
+    STATE.with(|state| {
+        let mut state = state.borrow_mut();
+        match get_key().code {
+            KeyCode::Up => {
+                state.selected = state.selected.saturating_sub(1);
+            }
+            KeyCode::Down => {
+                let next = state.selected.saturating_add(1);
+                state.selected = min(state.files.len() - 1, next);
+            }
+            KeyCode::Right => {
+                let path = &state.files[state.selected].path();
+                let entry = &state.files[state.selected];
+                if entry.file_type().unwrap().is_dir() {
+                    state.path = path.clone();
+                    state.selected = 0;
+                    drop(state);
+                    refresh_directory();
+                } else {
+                    open_file(path);
+                }
+            }
+            KeyCode::Left => {
+                state.path.pop();
+                state.selected = 0;
+                drop(state);
+                refresh_directory();
+            }
+            _ => (),
+        };
+    });
+}
+
+fn refresh_directory() {
+    STATE.with(|state| {
+        let mut state = state.borrow_mut();
+        state.files = fs::read_dir(&state.path).unwrap()
+        .filter_map(|res| res.ok())
+        .collect();
+
+        state.files.sort_by_key(DirEntry::path);
     });
 }
