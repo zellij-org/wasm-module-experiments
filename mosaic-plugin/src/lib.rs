@@ -1,5 +1,5 @@
+use serde::{Deserialize, Serialize};
 use std::{io, path::Path};
-use serde::{Serialize, Deserialize};
 
 #[derive(Debug, PartialOrd, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize)]
 pub struct KeyEvent {
@@ -49,6 +49,6 @@ pub fn open_file(path: &Path) {
 }
 
 #[link(wasm_import_module = "mosaic")]
-extern {
+extern "C" {
     fn host_open_file();
 }

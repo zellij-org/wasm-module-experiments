@@ -11,9 +11,7 @@ pub struct OutputCapturer {
 
 impl OutputCapturer {
     pub fn new() -> Self {
-        Self {
-            buffer: Vec::new(),
-        }
+        Self { buffer: Vec::new() }
     }
     pub fn clear(&mut self) {
         self.buffer = Vec::new();

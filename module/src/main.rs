@@ -1,6 +1,11 @@
-use std::{fs::{self, DirEntry}, cell::RefCell, path::PathBuf, cmp::min};
 use colored::*;
-use mosaic_plugin::{get_key, KeyCode, open_file};
+use mosaic_plugin::{get_key, open_file, KeyCode};
+use std::{
+    cell::RefCell,
+    cmp::min,
+    fs::{self, DirEntry},
+    path::PathBuf,
+};
 
 thread_local! {
     static STATE: RefCell<State> = RefCell::new(State::default());
@@ -79,9 +84,10 @@ pub fn handle_key() {
 fn refresh_directory() {
     STATE.with(|state| {
         let mut state = state.borrow_mut();
-        state.files = fs::read_dir(&state.path).unwrap()
-        .filter_map(|res| res.ok())
-        .collect();
+        state.files = fs::read_dir(&state.path)
+            .unwrap()
+            .filter_map(|res| res.ok())
+            .collect();
 
         state.files.sort_by_key(DirEntry::path);
     });

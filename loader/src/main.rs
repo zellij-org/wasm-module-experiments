@@ -1,25 +1,28 @@
 mod fluff;
 
+use crossterm::event::{self, Event, KeyCode, KeyEvent};
+use crossterm::{terminal, ExecutableCommand};
+use std::{
+    error::Error,
+    io::{self, Stdout, Write},
+    process::Command,
+    sync::Arc,
+    sync::Mutex,
+};
+use tui::{backend::CrosstermBackend, Terminal};
 use wasmer::{Exports, Function, Instance, Module, Store, Value};
 use wasmer_compiler_singlepass::Singlepass;
 use wasmer_engine_jit::JIT;
 use wasmer_wasi::WasiState;
-use crossterm::{terminal, ExecutableCommand};
-use crossterm::event::{self, Event, KeyCode, KeyEvent};
-use std::{error::Error, sync::Mutex, io::{self, Stdout, Write}, path::Path, process::Command, sync::Arc, cell::RefCell};
-use tui::{backend::CrosstermBackend, Terminal};
-use serde_json;
 
 // FIXME: PR to write an ImportObject merging method
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // State, done poorly
-    let should_open_file = Arc::new(Mutex::new(false));
-
     // Let's pick a WASM file to load!
-    let paths = vec!["target/wasm32-wasi/debug/module.wasm",
-                                "asmscript/build/index.wasm",
-                                "wapm_packages/_/cowsay@0.2.0/target/wasm32-wasi/release/cowsay.wasm"
-                                ];
+    let paths = vec![
+        "target/wasm32-wasi/debug/module.wasm",
+        "asmscript/build/index.wasm",
+        "wapm_packages/_/cowsay@0.2.0/target/wasm32-wasi/release/cowsay.wasm",
+    ];
     println!("\n\nWhich WASM file would you like to load?");
     for (i, path) in paths.iter().enumerate() {
         println!("{}) {}", i + 1, path);
@@ -61,7 +64,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // and merge it with our host exports
     let mut import_object = wasi_env.import_object(&module)?;
     let mut host_exports = Exports::new();
-    host_exports.insert("host_open_file", Function::new_native_with_env(&store, Arc::clone(&wasi_env.state), host_open_file));
+    host_exports.insert(
+        "host_open_file",
+        Function::new_native_with_env(&store, Arc::clone(&wasi_env.state), host_open_file),
+    );
     import_object.register("mosaic", host_exports);
     let instance = Instance::new(&module, &import_object)?;
 
@@ -86,7 +92,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut state = wasi_env.state();
             let wasi_file = state.fs.stdout_mut()?.as_mut().unwrap();
             let output: &mut fluff::OutputCapturer = wasi_file.downcast_mut().unwrap();
-            write!(io::stdout(), "{}\n\r", output.to_string().lines().collect::<Vec<_>>().join("\n\r"))?;
+            write!(
+                io::stdout(),
+                "{}\n\r",
+                output.to_string().lines().collect::<Vec<_>>().join("\n\r")
+            )?;
             output.clear();
 
             let wasi_file = state.fs.stdin_mut()?.as_mut().unwrap();
@@ -94,7 +104,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             input.clear();
 
             match event::read()? {
-                Event::Key(KeyEvent { code: KeyCode::Char('q'), ..}) => break,
+                Event::Key(KeyEvent {
+                    code: KeyCode::Char('q'),
+                    ..
+                }) => break,
                 Event::Key(e) => {
                     writeln!(input, "{}\r", serde_json::to_string(&e)?)?;
                 }
@@ -134,6 +147,9 @@ fn host_open_file(arc_state: &mut Arc<Mutex<WasiState>>) {
     let mut state = arc_state.lock().unwrap();
     let wasi_file = state.fs.stdout_mut().unwrap().as_mut().unwrap();
     let output: &mut fluff::OutputCapturer = wasi_file.downcast_mut().unwrap();
-    Command::new("xdg-open").arg(output.to_string().lines().next().unwrap()).spawn().unwrap();
+    Command::new("emacs")
+        .arg(output.to_string().lines().next().unwrap())
+        .spawn()
+        .unwrap();
     output.clear();
 }
