@@ -7,3 +7,4 @@ edition = "2018"
 [dependencies]
 colored = "2"
 mosaic-plugin = {version = "*", path = "../mosaic-plugin/"}
+pretty-bytes = "*"

@@ -5,7 +5,7 @@ use crossterm::{terminal, ExecutableCommand};
 use std::{
     error::Error,
     io::{self, Stdout, Write},
-    process::Command,
+    process::{Command, Stdio},
     sync::Arc,
     sync::Mutex,
 };
@@ -14,6 +14,8 @@ use wasmer::{Exports, Function, Instance, Module, Store, Value};
 use wasmer_compiler_singlepass::Singlepass;
 use wasmer_engine_jit::JIT;
 use wasmer_wasi::WasiState;
+
+static ROOT_PATH: &str = "/home/tll/Documents";
 
 // FIXME: PR to write an ImportObject merging method
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -53,7 +55,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut wasi_env = WasiState::new("hello")
         .args(&["These are words of wisdom coming from the mighty Mosaic!"])
         .env("CLICOLOR_FORCE", "1")
-        .preopen_dir(".")?
+        .preopen(|p|p.directory(ROOT_PATH).alias(".").read(true))?
         .stdin(Box::new(input))
         .stdout(Box::new(output))
         .finalize()?;
@@ -147,8 +149,9 @@ fn host_open_file(arc_state: &mut Arc<Mutex<WasiState>>) {
     let mut state = arc_state.lock().unwrap();
     let wasi_file = state.fs.stdout_mut().unwrap().as_mut().unwrap();
     let output: &mut fluff::OutputCapturer = wasi_file.downcast_mut().unwrap();
-    Command::new("emacs")
-        .arg(output.to_string().lines().next().unwrap())
+    Command::new("gedit")
+        .arg(format!("{}/{}", ROOT_PATH, output.to_string().lines().next().unwrap()))
+        .stderr(Stdio::null())
         .spawn()
         .unwrap();
     output.clear();
