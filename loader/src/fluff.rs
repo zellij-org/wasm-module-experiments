@@ -5,11 +5,11 @@ use wasmer_wasi::{WasiFile, WasiFsError};
 
 /// For capturing stdout/stderr. Stores all output in a string.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct OutputCapturer {
+pub struct Pipe {
     pub buffer: Vec<u8>,
 }
 
-impl OutputCapturer {
+impl Pipe {
     pub fn new() -> Self {
         Self { buffer: Vec::new() }
     }
@@ -18,14 +18,14 @@ impl OutputCapturer {
     }
 }
 
-impl Display for OutputCapturer {
+impl Display for Pipe {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", std::str::from_utf8(&self.buffer[..]).unwrap())
     }
 }
 
 #[typetag::serde]
-impl WasiFile for OutputCapturer {
+impl WasiFile for Pipe {
     fn last_accessed(&self) -> u64 {
         0
     }
@@ -51,13 +51,13 @@ impl WasiFile for OutputCapturer {
 }
 
 // fail when reading or Seeking
-impl Read for OutputCapturer {
+impl Read for Pipe {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         (&self.buffer[..]).read(buf)
     }
 }
 
-impl Seek for OutputCapturer {
+impl Seek for Pipe {
     fn seek(&mut self, _pos: io::SeekFrom) -> io::Result<u64> {
         Err(io::Error::new(
             io::ErrorKind::Other,
@@ -66,7 +66,7 @@ impl Seek for OutputCapturer {
     }
 }
 
-impl Write for OutputCapturer {
+impl Write for Pipe {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.buffer.extend(buf);
         Ok(buf.len())
