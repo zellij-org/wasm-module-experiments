@@ -55,7 +55,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut wasi_env = WasiState::new("hello")
         .args(&["These are words of wisdom coming from the mighty Mosaic!"])
         .env("CLICOLOR_FORCE", "1")
-        .preopen(|p|p.directory(ROOT_PATH).alias(".").read(true))?
+        .preopen(|p| p.directory(ROOT_PATH).alias(".").read(true))?
         .stdin(Box::new(input))
         .stdout(Box::new(output))
         .finalize()?;
@@ -150,7 +150,11 @@ fn host_open_file(arc_state: &mut Arc<Mutex<WasiState>>) {
     let wasi_file = state.fs.stdout_mut().unwrap().as_mut().unwrap();
     let output: &mut fluff::OutputCapturer = wasi_file.downcast_mut().unwrap();
     Command::new("gedit")
-        .arg(format!("{}/{}", ROOT_PATH, output.to_string().lines().next().unwrap()))
+        .arg(format!(
+            "{}/{}",
+            ROOT_PATH,
+            output.to_string().lines().next().unwrap()
+        ))
         .stderr(Stdio::null())
         .spawn()
         .unwrap();

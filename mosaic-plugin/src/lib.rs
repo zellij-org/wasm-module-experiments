@@ -1,54 +1,43 @@
-use serde::{Deserialize, Serialize};
-use std::{io, path::Path};
+mod keys;
+mod shim;
 
-#[derive(Debug, PartialOrd, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize)]
-pub struct KeyEvent {
-    pub code: KeyCode,
-    pub modifiers: KeyModifiers,
+pub use keys::*;
+pub use shim::*;
+
+pub trait MosaicPlugin {
+    fn init(&mut self);
+    fn draw(&mut self, rows: usize, cols: usize);
+    fn handle_key(&mut self, key: KeyEvent);
 }
 
-#[derive(Debug, PartialOrd, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize)]
-pub struct KeyModifiers {
-    pub bits: u8,
-    //pub shift: bool,
-    //pub ctrl: bool,
-    //pub alt: bool,
-}
+#[macro_export]
+macro_rules! register_plugin {
+    ($t:ty) => {
+        use mosaic_plugin::*;
 
-#[derive(Debug, PartialOrd, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize)]
-pub enum KeyCode {
-    Backspace,
-    Enter,
-    Left,
-    Right,
-    Up,
-    Down,
-    Home,
-    End,
-    PageUp,
-    PageDown,
-    Tab,
-    BackTab,
-    Delete,
-    Insert,
-    F(u8),
-    Char(char),
-    Null,
-    Esc,
-}
+        use std::cell::RefCell;
+        thread_local! {
+            static STATE: RefCell<$t> = RefCell::new(Default::default());
+        }
 
-pub fn get_key() -> KeyEvent {
-    let mut json = String::new();
-    io::stdin().read_line(&mut json).unwrap();
-    serde_json::from_str(&json).unwrap()
-}
+        fn main() {
+            STATE.with(|state| {
+                state.borrow_mut().init();
+            });
+        }
 
-pub fn open_file(path: &Path) {
-    println!("{}", path.to_string_lossy());
-    unsafe { host_open_file() };
-}
+        #[no_mangle]
+        pub fn draw(rows: i32, cols: i32) {
+            STATE.with(|state| {
+                state.borrow_mut().draw(rows as usize, cols as usize);
+            });
+        }
 
-#[link(wasm_import_module = "mosaic")]
-extern "C" {
-    fn host_open_file();
+        #[no_mangle]
+        pub fn handle_key() {
+            STATE.with(|state| {
+                state.borrow_mut().handle_key(get_key());
+            });
+        }
+    };
 }
