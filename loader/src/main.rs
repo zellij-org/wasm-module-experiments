@@ -14,7 +14,7 @@ use wasmer::{Exports, Function, Instance, Module, Store, Value, JIT};
 use wasmer_compiler_singlepass::Singlepass;
 use wasmer_wasi::WasiState;
 
-static ROOT_PATH: &str = "/home/tll/Documents";
+static ROOT_PATH: &str = ".";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let store = Store::new(&JIT::new(&Singlepass::default()).engine());
