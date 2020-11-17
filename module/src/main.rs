@@ -13,16 +13,16 @@ impl MosaicPlugin for State {
     }
 
     fn draw(&mut self, rows: usize, cols: usize) {
-        for i in 0..rows as usize - 1 {
+        for i in 0..rows - 1 {
             if self.selected() < self.scroll() {
                 *self.scroll_mut() = self.selected();
             }
-            if self.selected() - self.scroll() + 2 > rows as usize {
-                *self.scroll_mut() = self.selected() + 2 - rows as usize;
+            if self.selected() - self.scroll() + 2 > rows {
+                *self.scroll_mut() = self.selected() + 2 - rows;
             }
             let i = self.scroll() + i;
             if let Some(entry) = self.files.get(i) {
-                let mut path = entry.as_line(cols as usize).normal();
+                let mut path = entry.as_line(cols).normal();
 
                 if let FsEntry::Dir(..) = entry {
                     path = path.dimmed().bold();
