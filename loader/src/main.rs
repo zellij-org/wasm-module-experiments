@@ -6,18 +6,15 @@ use std::{
     error::Error,
     io::{self, Stdout, Write},
     process::{Command, Stdio},
-    sync::Arc,
-    sync::Mutex,
 };
 use tui::{backend::CrosstermBackend, Terminal};
-use wasmer::{Exports, Function, Instance, Module, Store, Value, JIT};
-use wasmer_compiler_singlepass::Singlepass;
-use wasmer_wasi::WasiState;
+use wasmer::{Function, Instance, Module, Store, Value};
+use wasmer_wasi::{WasiEnv, WasiState};
 
 static ROOT_PATH: &str = ".";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let store = Store::new(&JIT::new(&Singlepass::default()).engine());
+    let store = Store::default();
 
     println!("Compiling module...");
     // FIXME: Switch to a higher performance compiler (`Store::default()`) and cache this on disk
@@ -40,18 +37,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .stdout(Box::new(output))
         .finalize()?;
 
-    let mut import_object = wasi_env.import_object(&module)?;
-    // FIXME: Upstream an `ImportObject` merge method
-    let mut host_exports = Exports::new();
-    host_exports.insert(
-        "host_open_file",
-        Function::new_native_with_env(&store, Arc::clone(&wasi_env.state), host_open_file),
-    );
-    import_object.register("mosaic", host_exports);
-    let instance = Instance::new(&module, &import_object)?;
+    // Imports for below
+    use wasmer::imports;
+    use wasmer::ChainableNamedResolver;
 
-    // WASI requires to explicitly set the memory for the `WasiEnv`
-    wasi_env.set_memory(instance.exports.get_memory("memory")?.clone());
+    let import_object = imports! {
+        "mosaic" => {
+            "host_open_file" => Function::new_native_with_env(&store, wasi_env.clone(), host_open_file)
+        }
+    };
+
+    let instance = Instance::new(
+        &module,
+        &import_object.chain_front(wasi_env.import_object(&module)?),
+    )?;
+
+    // End ----------------------------------------------------------------------------------------
 
     let start = instance.exports.get_function("_start")?;
     let handle_key = instance.exports.get_function("handle_key")?;
@@ -122,8 +123,8 @@ pub fn teardown_tui(mut tui: TUI) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn host_open_file(arc_state: &mut Arc<Mutex<WasiState>>) {
-    let mut state = arc_state.lock().unwrap();
+fn host_open_file(wasi_env: &WasiEnv) {
+    let mut state = wasi_env.state();
     let wasi_file = state.fs.stdout_mut().unwrap().as_mut().unwrap();
     let output: &mut fluff::Pipe = wasi_file.downcast_mut().unwrap();
     Command::new("xdg-open")

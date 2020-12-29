@@ -3,7 +3,7 @@ use std::fmt::{self, Display};
 use std::io::{self, Read, Seek, Write};
 use wasmer_wasi::{WasiFile, WasiFsError};
 
-/// For capturing stdout/stderr. Stores all output in a string.
+/// For piping stdio. Stores all output / input in a byte-vector.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Pipe {
     pub buffer: Vec<u8>,
@@ -14,13 +14,13 @@ impl Pipe {
         Self { buffer: Vec::new() }
     }
     pub fn clear(&mut self) {
-        self.buffer = Vec::new();
+        self.buffer.clear();
     }
 }
 
 impl Display for Pipe {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", std::str::from_utf8(&self.buffer[..]).unwrap())
+        write!(f, "{}", String::from_utf8_lossy(&self.buffer[..]))
     }
 }
 
@@ -36,21 +36,19 @@ impl WasiFile for Pipe {
         0
     }
     fn size(&self) -> u64 {
-        0
+        self.buffer.len() as u64
     }
-    fn set_len(&mut self, _len: u64) -> Result<(), WasiFsError> {
-        Ok(())
+    fn set_len(&mut self, len: u64) -> Result<(), WasiFsError> {
+        Ok(self.buffer.resize(len as usize, 0))
     }
     fn unlink(&mut self) -> Result<(), WasiFsError> {
         Ok(())
     }
     fn bytes_available(&self) -> Result<usize, WasiFsError> {
-        // return an arbitrary amount
-        Ok(1024)
+        Ok(self.buffer.len())
     }
 }
 
-// fail when reading or Seeking
 impl Read for Pipe {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         (&self.buffer[..]).read(buf)
@@ -61,7 +59,7 @@ impl Seek for Pipe {
     fn seek(&mut self, _pos: io::SeekFrom) -> io::Result<u64> {
         Err(io::Error::new(
             io::ErrorKind::Other,
-            "can not seek capturing stdout",
+            "can not seek in a pipe",
         ))
     }
 }
